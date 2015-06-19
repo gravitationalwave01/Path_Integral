@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <random>
+#include <sstream>
 
 //#define pb push_back;
 
@@ -110,23 +111,85 @@ double integrate(std::vector<std::pair<double,double> >* func)
   return ans;
 }
 
+double simpson(std::vector<std::pair<double,double> >* func) // implementing simpson's rule to integrate func
+{
+  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
+  double ans = 0;
+  for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 2; it < func->end(); it+=2)
+    ans += delta * ( (it-2)->second + 4 * (it-1)->second + it->second ) / 3; //simpson's 3/8 rule -- integrates three intervals at a time
+
+
+  int rem = func->size() % 2; // if we have leftover intervals
+  std::vector<std::pair<double,double> >::iterator it = func->end();
+  if (rem == 0)
+    ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
+
+  return ans;
+}
+
+double simpson38(std::vector<std::pair<double,double> >* func) // implementing simpson's 3/8's rule to integrate func
+{
+
+  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
+  double ans = 0;
+  for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 3; it < func->end(); it+=3)
+    ans += 3.0/8.0 * delta * ( (it-3)->second + 3 * (it-2)->second + 3 * (it-1)->second + it->second ); //simpson's 3/8 rule -- integrates three intervals at a time
+
+  
+  int rem = func->size() % 3; // if we have leftover intervals
+  std::vector<std::pair<double,double> >::iterator it = func->end();
+  if (rem != 1)
+    if (rem == 2)
+      ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
+    else if (rem == 0)
+      ans += delta * ( (it-3)->second + 4 * (it-2)->second + (it-1)->second ) / 3; //simpson's rule for last two intervals
+
+  return ans;
+}
 
 
 int main()
 {
+  int pspace_ctr = 0;
+  std::vector<double> v_time{10000,50000,100000,500000};
+  std::vector<double> v_dlambda{0.1,0.05,0.02,0.01};
+  std::vector<double> v_deltaT{1,0.05,0.02,0.01,0.005};
+  std::ofstream result("./data/deltaF.dat");
+
+  result << "The output is formatted as follows: " << std::endl;
+  result << "pspace index   time    deltaT    dlambda   trial  simp38   simp   trap " << std::endl;
+
+
+  for (std::vector<double>::iterator vt_it = v_time.begin(); vt_it < v_time.end(); vt_it++)
+  {
+  for (std::vector<double>::iterator vl_it = v_dlambda.begin(); vl_it < v_dlambda.end(); vl_it++)
+  {
+  for (std::vector<double>::iterator vdt_it = v_deltaT.begin(); vdt_it < v_deltaT.end(); vdt_it++)
+  {
+
+  for (int trial = 0; trial < 5; trial++);
+  {
+  
+  double time = *vt_it;
+  double deltaT = *vdt_it;
+  double dlambda = *vl_it;
+
   //initialize some constants
   int dim = 1;
   int P = 1;
-  double time = 30000000;
-  double deltaT = 0.05;
+  //  double time = 50000;
+  //  double deltaT = 0.01;
 
 
   //open the output files:
-  std::ofstream fpos("positions.dat"); //for positions
-  std::ofstream fvel("velocities.dat"); //for velocities
-  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
-  std::ofstream fpot("fpot.dat");   // for dU/dlambda
-  std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
+  //  std::ofstream fpos("positions.dat"); //for positions
+  //  std::ofstream fvel("velocities.dat"); //for velocities
+  //  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
+
+  std::stringstream fname("");
+  fname  << "./data/fpot" << pspace_ctr << "_t" << trial << ".dat"; //name of output file.
+  std::ofstream fpot(fname.str().c_str());   // file for storing dU/dlambda values
+  //  std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
 
   //create the two potentials
   HarmonicPotential hp1(1.0,3.0);
@@ -134,7 +197,7 @@ int main()
 
   //Initialize the random number generators
   std::default_random_engine generator;
-  double a = 2; // a^2 = kT/m
+  double a = 1; // a^2 = kT/m
   std::normal_distribution<double> distribution(0,a);
 
 
@@ -183,8 +246,8 @@ int main()
   int numCols = 0; //number of collisions
   double prefactor = 0.5 * hp1.mass * (hp2.omega*hp2.omega - hp1.omega*hp1.omega);
   // Smoothly vary the potential-flipping parameter:
-  double dlambda = 0.05;
-  for (double lambda = 0; lambda <= 1.01; lambda += dlambda)
+  //  double dlambda = 0.02;
+  for (double lambda = 0; lambda <= 1.0001; lambda += dlambda)
   {
     pot = 0;
     numSamples = 0;
@@ -201,8 +264,6 @@ int main()
 	    for (int curDim = 0; curDim < myRP->dim; curDim++)
 	    {
 	      myRP->beads[curBead].velocity[curDim] = distribution(generator);
-	      //	      myRP->beads[curBead].position[curDim] = 0;
-
 	    }
 	timeSinceLast = 0;
 	numCols++;
@@ -258,32 +319,17 @@ int main()
 
       } //end of VV loop
       
-      // sample dU/dlambda with some probability:
-      //this code assumes that we know the analytic form of dU/dlambda, which is only true for particular choices of U and particular V_A and V_B.
-      /*
-      if (distribution(generator) >= 0 && timeSinceLast > 7) // 
-	for (std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
-	  for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
-	    for (int j=0;j<dim;j++)
-	    {
-	      pot += it->position[j] * it->position[j];// * it->velocity[j];
-	      numSamples++;
-	      dist << lambda << " " << it->velocity[j] << " " << it->position[j] << std::endl;
-	    }
-      */
 
       // sample dU/dlambda with some probability.
       // to sample dU/dlambda we really sample <x>, plug this x into (U_{lambda+dlambda/2) - U_{lambda-dlambda}) / 2
-      if (distribution(generator) >= 0 && timeSinceLast > 7) // 
+      if (distribution(generator) >= 0 && timeSinceLast > 5) // 
 	for (std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
 	  for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
 	    for (int j=0;j<dim;j++)
 	    {
-	      //	      pot += ( (1-(lambda+dlambda/2))*hp1.getPotential(it->position[j]) + (lambda+dlambda/2)*hp2.getPotential(it->position[j]) 
-	      //		     - (1-(lambda-dlambda/2))*hp1.getPotential(it->position[j]) + (lambda-dlambda/2)*hp2.getPotential(it->position[j]) ) / dlambda;
 	      pot += hp2.getPotential(it->position[j]) - hp1.getPotential(it->position[j]);
 	      numSamples++;
-	      dist << lambda << " " << it->velocity[j] << " " << it->position[j] << std::endl;
+	      //	      dist << lambda << " " << it->velocity[j] << " " << it->position[j] << std::endl;
 	    }
 
       timeSinceLast += deltaT; 
@@ -301,13 +347,13 @@ int main()
 
 
   //output the obtained values of dU/dlambda
-  std::cout << "Here are the values of the potential" << std::endl;
+  std::cout << "Here are the values of the integrand:" << std::endl;
   for (std::vector<std::pair<double,double> >::iterator it = integrand.begin(); it < integrand.end(); it++)
-    std::cout << it->first << " " << it->second << std::endl;
-  std::cout << "Done outputting the values of the potential" << std::endl;
+    fpot << it->first << " " << it->second << std::endl;
 
 
-  std::cout << " NUMBER OF COLLISIONS: " << numCols << std::endl;
+
+  //  std::cout << " NUMBER OF COLLISIONS: " << numCols << std::endl;
   //  std::vector<std::pair<double,double> > test;
   /*
   test.push_back(std::pair<double,double>(0.0,5));
@@ -322,7 +368,20 @@ int main()
   test.push_back(std::pair<double,double>(4.5,25.25));
   test.push_back(std::pair<double,double>(5.0,30));
   */
+
   std::cout << "FREE ENERGY DIFFERENCE IS : " << std::endl;
-  std::cout << integrate(&integrand) << std::endl;
+  std::cout << "by simpson's 3/8 rule integration: " << simpson38(&integrand) << std::endl;
+  std::cout << "by simpson's rule integration: " << simpson(&integrand) << std::endl;
+  std::cout << "by trapzoidal method integration: " << integrate(&integrand) << std::endl;
+
+  result << pspace_ctr << " " << time << " " << deltaT << " " << dlambda << " " << trial << " " << 
+    simpson38(&integrand) << " " << simpson(&integrand) << " " << integrate(&integrand) << std::endl;
+
+  }
+  result << std::endl;
+  pspace_ctr++;
+  }
+  }
+  }
   
 };
