@@ -11,6 +11,6 @@ set ylabel "occurances"
 binwidth = .02
 bin(x,width)=width*floor(x/width)
 
-plot "dist.dat" u (bin($2,binwidth)):(1.0) smooth freq with boxes title "velocities"#, "dist.dat" u (bin($3,binwidth)):(1.0) smooth freq with boxes title "positions"
-#plot "test.dat" u (bin($1,binwidth)):(1.0) smooth freq with boxes notitle
+#plot "dist.dat" u (bin($2,binwidth)):(1.0) smooth freq with boxes title "velocities"#, "dist.dat" u (bin($3,binwidth)):(1.0) smooth freq with boxes title "positions"
+plot "work.dat" u (bin($1,binwidth)):(1.0) smooth freq with boxes notitle
 
