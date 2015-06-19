@@ -1,3 +1,12 @@
+//June 17,2015.
+//This code correctly computes the free energy difference between two 1D harmonic oscillators by Thermodynamic integration.
+//I use a control parameter lambda (0 -> 1) to vary the potential from V_A to V_B, and for each lambda step I compute the 
+//thermodynamic expectation value of dU/dlambda, where U is the current potential (somewhere in between V_A and V_B).
+// specifically, I choose U = lambda V_B + (1-lambda) V_A, so dU/dlambda is analytically known
+
+//For reference, V_A/B = 0.5 * m * omega_A/B^2 * x^2, so <dU/dlambda> = 0.5 * m * (omega_B^2-omega_A^2) * <x^2>
+//delta F = \int_0^1 <dU/dlambda> dlambda
+
 #include <utility>
 #include <iostream>
 #include <fstream>
@@ -7,7 +16,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <random>
-#include <sstream>
 
 //#define pb push_back;
 
@@ -111,85 +119,23 @@ double integrate(std::vector<std::pair<double,double> >* func)
   return ans;
 }
 
-double simpson(std::vector<std::pair<double,double> >* func) // implementing simpson's rule to integrate func
-{
-  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
-  double ans = 0;
-  for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 2; it < func->end(); it+=2)
-    ans += delta * ( (it-2)->second + 4 * (it-1)->second + it->second ) / 3; //simpson's 3/8 rule -- integrates three intervals at a time
-
-
-  int rem = func->size() % 2; // if we have leftover intervals
-  std::vector<std::pair<double,double> >::iterator it = func->end();
-  if (rem == 0)
-    ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
-
-  return ans;
-}
-
-double simpson38(std::vector<std::pair<double,double> >* func) // implementing simpson's 3/8's rule to integrate func
-{
-
-  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
-  double ans = 0;
-  for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 3; it < func->end(); it+=3)
-    ans += 3.0/8.0 * delta * ( (it-3)->second + 3 * (it-2)->second + 3 * (it-1)->second + it->second ); //simpson's 3/8 rule -- integrates three intervals at a time
-
-  
-  int rem = func->size() % 3; // if we have leftover intervals
-  std::vector<std::pair<double,double> >::iterator it = func->end();
-  if (rem != 1)
-    if (rem == 2)
-      ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
-    else if (rem == 0)
-      ans += delta * ( (it-3)->second + 4 * (it-2)->second + (it-1)->second ) / 3; //simpson's rule for last two intervals
-
-  return ans;
-}
 
 
 int main()
 {
-  int pspace_ctr = 0;
-  std::vector<double> v_time{10000,50000,100000,500000};
-  std::vector<double> v_dlambda{0.1,0.05,0.02,0.01};
-  std::vector<double> v_deltaT{1,0.05,0.02,0.01,0.005};
-  std::ofstream result("./data/deltaF.dat");
-
-  result << "The output is formatted as follows: " << std::endl;
-  result << "pindex   time    deltaT    dlambda   trial  simp38   simp   trap " << std::endl;
-
-
-  for (std::vector<double>::iterator vt_it = v_time.begin(); vt_it < v_time.end(); vt_it++)
-  {
-  for (std::vector<double>::iterator vl_it = v_dlambda.begin(); vl_it < v_dlambda.end(); vl_it++)
-  {
-  for (std::vector<double>::iterator vdt_it = v_deltaT.begin(); vdt_it < v_deltaT.end(); vdt_it++)
-  {
-
-  for (int trial = 0; trial < 5; trial++)
-  {
-  
-  double time = *vt_it;
-  double deltaT = *vdt_it;
-  double dlambda = *vl_it;
-
   //initialize some constants
   int dim = 1;
   int P = 1;
-  //  double time = 50000;
-  //  double deltaT = 0.01;
+  double time = 100000;
+  double deltaT = 0.05;
 
 
   //open the output files:
-  //  std::ofstream fpos("positions.dat"); //for positions
-  //  std::ofstream fvel("velocities.dat"); //for velocities
-  //  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
-
-  std::stringstream fname("");
-  fname  << "./data/fpot" << pspace_ctr << "_t" << trial << ".dat"; //name of output file.
-  std::ofstream fpot(fname.str().c_str());   // file for storing dU/dlambda values
-  //  std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
+  std::ofstream fpos("positions.dat"); //for positions
+  std::ofstream fvel("velocities.dat"); //for velocities
+  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
+  std::ofstream fpot("fpot.dat");   // for dU/dlambda
+  std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
 
   //create the two potentials
   HarmonicPotential hp1(1.0,3.0);
@@ -197,7 +143,7 @@ int main()
 
   //Initialize the random number generators
   std::default_random_engine generator;
-  double a = 1; // a^2 = kT/m
+  double a = 2; // a^2 = kT/m
   std::normal_distribution<double> distribution(0,a);
 
 
@@ -208,7 +154,7 @@ int main()
 
 
   //initialize the ensemble with RP positions and velocities randomly from this distribution
-  //  std::cout << " **** STARTING RP INIT  ****" << std::endl;
+  std::cout << " **** STARTING RP INIT  ****" << std::endl;
   for (int i = 0; i < numPolymers; i++)
   {
     std::vector<double> positions;
@@ -245,14 +191,14 @@ int main()
   double timeSinceLast = 0; //time since the last collision with the heat bath
   int numCols = 0; //number of collisions
   double prefactor = 0.5 * hp1.mass * (hp2.omega*hp2.omega - hp1.omega*hp1.omega);
+
   // Smoothly vary the potential-flipping parameter:
-  //  double dlambda = 0.02;
-  for (double lambda = 0; lambda <= 1.0001; lambda += dlambda)
+  for (double lambda = 0; lambda <= 1.01; lambda += 0.1)
   {
     pot = 0;
     numSamples = 0;
-    //    std::cout << " ************** CURRENT LAMBDA ************* " << lambda << std::endl;    
-    timeSinceLast = 100000; //to ensure that the first thing to happen is a collision with bath
+    std::cout << " ************** CURRENT LAMBDA ************* " << lambda << std::endl;    
+    timeSinceLast = 100; //to ensure that the first thing to happen is a collision with bath
 
     for (double curTime = 0; curTime < time; curTime+=deltaT)
     {
@@ -264,13 +210,15 @@ int main()
 	    for (int curDim = 0; curDim < myRP->dim; curDim++)
 	    {
 	      myRP->beads[curBead].velocity[curDim] = distribution(generator);
+	      //	      myRP->beads[curBead].position[curDim] = 0;
+
 	    }
 	timeSinceLast = 0;
 	numCols++;
       }
 
-      //      kinetic=0;
-      //      potential=0;
+      kinetic=0;
+      potential=0;
       for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
       {
 
@@ -309,58 +257,84 @@ int main()
 	    myRP->beads[curBead].velocity[j] += deltaT * 0.5 / myRP->beads[curBead].mass * (oldForces[curBead*dim+j]+curForces[curBead*dim+j]);
 	
 	//compute current potential and kinetic energies
-	//	for (int curBead = 0; curBead < myRP->P; curBead++)
-	//	  for (int j=0;j<dim;j++)
-	//	  {
-	//	    kinetic += 0.5 * myRP->beads[curBead].mass * myRP->beads[curBead].velocity[j] * myRP->beads[curBead].velocity[j];
-	//	    potential += ( (1-lambda)*hp1.getPotential(myRP->beads[curBead].position[j]) + lambda*hp2.getPotential(myRP->beads[curBead].position[j]) );
-	//	  }
+	for (int curBead = 0; curBead < myRP->P; curBead++)
+	  for (int j=0;j<dim;j++)
+	  {
+	    kinetic += 0.5 * myRP->beads[curBead].mass * myRP->beads[curBead].velocity[j] * myRP->beads[curBead].velocity[j];
+	    potential += ( (1-lambda)*hp1.getPotential(myRP->beads[curBead].position[j]) + lambda*hp2.getPotential(myRP->beads[curBead].position[j]) );
+	  }
 
 
       } //end of VV loop
       
+      /*
+      //record the position and velocity of just one of the polymers:
 
-      // sample dU/dlambda with some probability.
-      // to sample dU/dlambda we really sample <x>, plug this x into (U_{lambda+dlambda/2) - U_{lambda-dlambda}) / 2
-      if (distribution(generator) >= 0 && timeSinceLast > 5) // 
+      fpos << curTime+time*lambda*10 << " ";
+      fvel << curTime+time*lambda*10 << " ";
+
+      for (std::vector<Bead>::iterator it = ensemble[0].beads.begin(); it < ensemble[0].beads.end(); it++)
+      {
+	for (int j=0;j<dim;j++)
+	{
+	  fpos << it->position[j] << " "; 
+	  fvel << it->velocity[j] << " ";
+	}
+      }
+
+      fpos << std::endl;
+      fvel << std::endl;
+
+      fene << curTime+time*lambda*10 << " " << kinetic << " " << potential << std::endl; 
+      */
+
+      // sample the dU/dlambda with some probability:
+      if (distribution(generator) >= 0 && timeSinceLast > 7) // 
 	for (std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
 	  for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
 	    for (int j=0;j<dim;j++)
 	    {
-	      pot += hp2.getPotential(it->position[j]) - hp1.getPotential(it->position[j]);
+	      pot += it->position[j] * it->position[j];// * it->velocity[j];
 	      numSamples++;
-	      //	      dist << lambda << " " << it->velocity[j] << " " << it->position[j] << std::endl;
+	      dist << lambda << " " << it->velocity[j] << " " << it->position[j] << std::endl;
 	    }
+      timeSinceLast += deltaT;
+    } //end of time loop
 
-      timeSinceLast += deltaT; 
-   } //end of time loop
-
-    integrand.push_back(std::pair<double,double>(lambda,pot/numSamples));
-    //    fpot << lambda << " " << pot/numSamples << " " << numSamples << std::endl;
+    integrand.push_back(std::pair<double,double>(lambda,pot*prefactor/numSamples));
+    fpot << lambda << " " << pot/numSamples << " " << numSamples << std::endl;
   } // end of lambda loop
 
   //close all output files:
-  //  fpos.close();
-  //  fvel.close();
-  //  fene.close();
-  //  fpot.close();
-  //
-
-  //output the obtained values of dU/dlambda
-  //  std::cout << "Here are the values of the integrand:" << std::endl;
-  for (std::vector<std::pair<double,double> >::iterator it = integrand.begin(); it < integrand.end(); it++)
-    fpot << it->first << " " << it->second << std::endl;
+  fpos.close();
+  fvel.close();
+  fene.close();
   fpot.close();
 
 
-  result << pspace_ctr << " " << time << " " << deltaT << " " << dlambda << " " << trial << " " << 
-    simpson38(&integrand) << " " << simpson(&integrand) << " " << integrate(&integrand) << std::endl;
+  //output the obtained values of dU/dlambda
+  std::cout << "Here are the values of the potential" << std::endl;
+  for (std::vector<std::pair<double,double> >::iterator it = integrand.begin(); it < integrand.end(); it++)
+    std::cout << it->first << " " << it->second << std::endl;
+  std::cout << "Done outputting the values of the potential" << std::endl;
 
-  }
-  result << std::endl;
-  pspace_ctr++;
-  }
-  }
-  }
+
+  std::cout << " NUMBER OF COLLISIONS: " << numCols << std::endl;
+  //  std::vector<std::pair<double,double> > test;
+  /*
+  test.push_back(std::pair<double,double>(0.0,5));
+  test.push_back(std::pair<double,double>(0.5,5.25));
+  test.push_back(std::pair<double,double>(1.0,6));
+  test.push_back(std::pair<double,double>(1.5,7.25));
+  test.push_back(std::pair<double,double>(2.0,9));
+  test.push_back(std::pair<double,double>(2.5,11.25));
+  test.push_back(std::pair<double,double>(3.0,14));
+  test.push_back(std::pair<double,double>(3.5,17.25));
+  test.push_back(std::pair<double,double>(4.0,21));
+  test.push_back(std::pair<double,double>(4.5,25.25));
+  test.push_back(std::pair<double,double>(5.0,30));
+  */
+  std::cout << "FREE ENERGY DIFFERENCE IS : " << std::endl;
+  std::cout << integrate(&integrand) << std::endl;
   
 };

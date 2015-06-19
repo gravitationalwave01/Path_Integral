@@ -1,0 +1,11 @@
+set terminal png
+set output "dyanmics.png"
+
+set title "Dyanmics of simple harmonic oscillator"
+set xlabel "time"
+#set ylabel "en"
+#set yrange[-1:5]
+
+plot "positions.dat" u 1:2 w l, "velocities.dat" u 1:2 w l
+
+

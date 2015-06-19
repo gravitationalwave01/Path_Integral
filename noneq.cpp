@@ -110,26 +110,48 @@ double integrate(std::vector<std::pair<double,double> >* func)
   return ans;
 }
 
+double simpson(std::vector<std::pair<double,double> >* func) // implementing simpson's rule to integrate func
+{
+  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
+  double ans = 0;
+  for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 2; it < func->end(); it+=2)
+  {
+    ans += delta * ( (it-2)->second + 4 * (it-1)->second + it->second ) / 3; //simpson's 3/8 rule -- integrates three intervals at a time
+    std::cout << ans << std::endl;
+  }
+
+  int rem = func->size() % 2; // if we have leftover intervals
+  std::vector<std::pair<double,double> >::iterator it = func->end();
+  //  std::cout << "rem is " << rem << " " << func->size() << std::endl;
+  if (rem == 0)
+    ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
+
+  return ans;
+}
+
 double simpson38(std::vector<std::pair<double,double> >* func) // implementing simpson's 3/8's rule to integrate func
 {
 
   double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
   double ans = 0;
   for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 3; it < func->end(); it+=3)
+  {
     ans += 3.0/8.0 * delta * ( (it-3)->second + 3 * (it-2)->second + 3 * (it-1)->second + it->second ); //simpson's 3/8 rule -- integrates three intervals at a time
-
+    std::cout << ans << std::endl;
+  }
   
   int rem = func->size() % 3; // if we have leftover intervals
   std::vector<std::pair<double,double> >::iterator it = func->end();
-  if (rem != 0)
-    if (rem == 1)
-      ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
+  //  std::cout << "rem is " << rem << " " << func->size() << std::endl;
+  if (rem != 1)
     if (rem == 2)
-      ans += delta * ( (it-3)->second + 4 * (it-2)->second + (it-1)->second ) / 3; //simpsons rule for the last two intervals
+      ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
+    else if (rem == 0)
+      ans += delta * ( (it-3)->second + 4 * (it-2)->second + (it-1)->second ) / 3; //simpson's rule for last two intervals
 
   return ans;
-
 }
+
 
 int main()
 {

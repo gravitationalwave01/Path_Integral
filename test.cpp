@@ -4,48 +4,85 @@
 #include <fstream>
 #include <math.h>
 
+
+double simpson(std::vector<std::pair<double,double> >* func) // implementing simpson's rule to integrate func
+{
+  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
+  double ans = 0;
+  for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 2; it < func->end(); it+=2)
+  {
+    ans += delta * ( (it-2)->second + 4 * (it-1)->second + it->second ) / 3; //simpson's 3/8 rule -- integrates three intervals at a time
+    std::cout << ans << std::endl;
+  }
+
+  int rem = func->size() % 2; // if we have leftover intervals
+  std::vector<std::pair<double,double> >::iterator it = func->end();
+  //  std::cout << "rem is " << rem << " " << func->size() << std::endl;
+  if (rem == 0)
+    ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
+
+  return ans;
+}
+
+double simpson38(std::vector<std::pair<double,double> >* func) // implementing simpson's 3/8's rule to integrate func
+{
+
+  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly 
+  double ans = 0;
+  for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 3; it < func->end(); it+=3)
+  {
+    ans += 3.0/8.0 * delta * ( (it-3)->second + 3 * (it-2)->second + 3 * (it-1)->second + it->second ); //simpson's 3/8 rule -- integrates three intervals at a time
+    std::cout << ans << std::endl;
+  }
+  
+  int rem = func->size() % 3; // if we have leftover intervals
+  std::vector<std::pair<double,double> >::iterator it = func->end();
+  //  std::cout << "rem is " << rem << " " << func->size() << std::endl;
+  if (rem != 1)
+    if (rem == 2)
+      ans += 0.5 * delta * ( (it-1)->second + (it-2)->second ); //trapezoid integration for the last interval
+    else if (rem == 0)
+      ans += delta * ( (it-3)->second + 4 * (it-2)->second + (it-1)->second ) / 3; //simpson's rule for last two intervals
+
+  return ans;
+}
+
+
+
+
+//this function integrates *func using the traezoidal method.
+double integrate(std::vector<std::pair<double,double> >* func)
+{
+  double delta = func->at(1).first - func->at(0).first; //assuming that the domain varies linearly and constantly
+  double ans = 0;
+  for (std::vector<std::pair<double,double> >::iterator it = func->begin(); it+1 < func->end(); it++)
+    ans += delta * ( (it+1)->second + it->second) / 2;
+  
+  return ans;
+}
+
+
 int main()
 {
-  /*
-  std::default_random_engine generator;
-  double a = 1; // a^2 = kT/m
-  std::normal_distribution<double> distribution(0,a);
+  std::vector<std::pair<double,double> > test;
 
-  std::ofstream output("test.dat");
-  int numSample = 1000000;
-  for (int i=0;i<numSample;i++)
-    output << distribution(generator) << std::endl;
-  */
+  test.push_back(std::pair<double,double>(0.0,5));
+  test.push_back(std::pair<double,double>(0.5,5.25));
+  test.push_back(std::pair<double,double>(1.0,6));
+  test.push_back(std::pair<double,double>(1.5,7.25));
+  test.push_back(std::pair<double,double>(2.0,9));
+  test.push_back(std::pair<double,double>(2.5,11.25));
+  test.push_back(std::pair<double,double>(3.0,14));
+  test.push_back(std::pair<double,double>(3.5,17.25));
+  test.push_back(std::pair<double,double>(4.0,21));
+  test.push_back(std::pair<double,double>(4.5,25.25));
+  test.push_back(std::pair<double,double>(5.0,30));
+  test.push_back(std::pair<double,double>(5.5,35.25));
 
-  std::ofstream prob("test.dat");
+  std::cout << "FREE ENERGY DIFFERENCE IS : " << std::endl;
+  std::cout << "simpson's 3/8: " << simpson38(&test) << std::endl;
+  std::cout << "simpson's: " << simpson(&test) << std::endl;
+  std::cout << "trapezoid: " << integrate(&test) << std::endl;
 
-  const double nrolls=1000000;  // number of experiments
-  
-  std::default_random_engine generator;
-  std::normal_distribution<double> distribution(0.0,.5);
-
-  double p[10000]={};
-  
-  int counter = 0;
-  for (int i=0; i<nrolls; ++i) {
-    double number = distribution(generator);
-    //    int num = (int)floor(number*100)+500;
-    //    if (num < 0 || num > 1000) std::cout << "out of bounds" << std::endl;
-    if ((number>=-5.0)&&(number<5.0)) 
-    {
-      p[(int)floor(number*1000)+5000]++; 
-      counter++;
-    }
-    else std::cout << "out of bounds" << std::endl;
-    
-  }
-  std::cout << "counter - numrolls = " << counter-nrolls << std::endl;
-  //  std::cout << "normal_distribution (5.0,2.0):" << std::endl;
-  
-  for (int i=0; i<10000; i++) {
-    //    std::cout << i << "-" << (i+1) << ": ";
-    prob << ((double)i-5000.0)/1000 << " " <<  p[i]/nrolls << std::endl;
-  }
-  
   return 0;
 }

@@ -1,0 +1,196 @@
+//This is a backup made 6/1/2015
+//It accurately propogates a classical particle a harmonic potential in time using the veloicty verlet algorithm.
+
+#include <utility>
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <math.h>
+#include <stdlib.h>
+
+//#define pb push_back;
+
+double getForce(double position, double mass)
+{
+  double omega = 1;
+  return -mass*omega*omega*position;
+}
+
+/*
+class TwoStatePotential
+{
+ public:
+  TwoStatePotential(std::vector<std::pair<double,double> > 
+}
+*/
+
+class Bead
+{
+ public:
+  int dim; //dimension of the system
+  double* position;
+  double* velocity;
+  double* force;
+  double mass;
+  
+  Bead(double* pos, int d, double* vel, double m)
+  {
+    dim = d;
+    force = new double[dim];
+    position = new double[dim];
+    velocity = new double[dim];
+    for (int i=0;i<dim;i++)
+    {
+      position[i] = pos[i];
+      velocity[i] = vel[i];
+    }
+    mass = m;
+  }
+
+  /*
+  Bead(int d)
+  {
+    dim = d;
+    position = new double[dim];
+    velocity = new double[dim];
+  }
+  */
+
+  void updateForces()
+  {
+    for (int i=0;i<dim;i++)
+      force[i] = getForce(position[i],mass);
+  }
+
+  void printMe()
+  {
+    std::cout << "bead position: ";
+    for (int i=0;i<dim;i++)
+      std::cout << position[i] << " ";
+    std::cout << std::endl;
+    
+    std::cout << "bead velocity: ";
+    for (int i=0;i<dim;i++)
+      std::cout << velocity[i] << " ";
+    std::cout << std::endl;
+  }
+};
+
+
+class RP
+{
+ public:
+  int dim; //dimension of the system
+  std::vector<Bead> beads;
+  int P; //number of beads
+
+  RP(int d, int numBeads, double* positions, double* velocities, double* masses)
+  {
+    P = numBeads;
+    dim = d;
+    std::cout << "numbeads is " << numBeads << std::endl;
+    for (int i =0; i < numBeads; i++)
+    {
+      std::cout << "here" << std::endl;
+      std::cout << *(positions+i*dim) << " " << dim << " " << *(velocities+i*dim) << " " << masses[i] << std::endl;
+      //      Bead* b = new Bead(positions+i*dim, dim, velocities+i*dim, masses[i]);
+      //      b->printMe();
+      beads.push_back(Bead(positions+i*dim, dim, velocities+i*dim, masses[i]));
+    }
+    std::cout << "supposedly initialized all the beads" << std::endl;
+    beads.at(0).printMe();
+  }
+
+
+  void updateForces()
+  {
+    for (std::vector<Bead>::iterator it = beads.begin(); it < beads.end(); it++)
+      it->updateForces();
+  }
+  
+  void printMe()
+  {
+    std::cout << "DETAILS OF THE RING POLYMER::" << std::endl;
+    std::cout << "POSITIONS:     VELOCITIES:" << std::endl;
+    //    for (int i = 0; i < P; i++)
+    //      std::cout << beads[i].position << "                       " << beads[i].velocity << std::endl;
+  }
+};
+
+
+
+int main()
+{
+  //initialize the ring polymer 
+  int dim = 3;
+  int P = 1;
+  double* positions = new double[dim*P];
+  double* velocities = new double[dim*P];
+  double* masses = new double[dim];
+  positions[0] = 1;
+  positions[1] = 2;
+  positions[2] = 3;
+  velocities[0] = 0;
+  velocities[1] = 0;
+  velocities[2] = 0;
+  masses[0] = 1;
+
+  RP myRP(dim,P,positions,velocities,masses);
+  double time = 10;
+  double deltaT = 0.01;
+  double kinetic = 0;
+  double potential = 0;
+
+  std::ofstream fpos("positions.dat");
+  std::ofstream fvel("velocities.dat");
+  std::ofstream fene("energy.dat");
+  
+  //propogate the ring polymer in time
+  double *oldForces = new double[myRP.P * dim]; //forces have x,y,z components for each bead
+  for (double curTime = 0; curTime < time; curTime+=deltaT)
+  {
+    kinetic = 0;
+    potential = 0;
+
+    myRP.updateForces();
+    for (int curBead = 0; curBead < myRP.P; curBead++)
+      for (int j=0;j<dim;j++)
+	myRP.beads[curBead].position[j] += deltaT * myRP.beads[curBead].mass * myRP.beads[curBead].velocity[j] 
+	  + deltaT * deltaT * 0.5 / myRP.beads[curBead].mass * myRP.beads[curBead].force[j];
+    
+    for (int i=0;i<myRP.P; i++)
+      for (int j=0;j<dim;j++)
+	oldForces[i*dim+j] = myRP.beads[i].force[j];
+    
+    myRP.updateForces();
+    
+    for (int curBead = 0; curBead < myRP.P; curBead++)
+      for (int j=0;j<dim;j++)
+	myRP.beads[curBead].velocity[j] += deltaT * 0.5 / myRP.beads[curBead].mass * (oldForces[curBead*dim+j]+myRP.beads[curBead].force[j]);
+    
+    for (int curBead = 0; curBead < myRP.P; curBead++)
+      for (int j=0;j<dim;j++)
+      {
+	kinetic += 0.5 * myRP.beads[curBead].mass * myRP.beads[curBead].velocity[j] * myRP.beads[curBead].velocity[j];
+	potential += 0.5 * myRP.beads[curBead].position[j] * myRP.beads[curBead].position[j]; //THIS ONLY WORKS WHILE m=k=1!!!!!
+      }
+
+    fene << curTime << " ";
+    fpos << curTime << " ";
+    fvel << curTime << " ";
+    for (std::vector<Bead>::iterator it = myRP.beads.begin(); it < myRP.beads.end(); it++)
+    {
+      for (int j=0;j<dim;j++)
+      {
+	fpos << it->position[j] << " ";
+	fvel << it->velocity[j] << " ";
+      }
+    }
+    fpos << std::endl;
+    fvel << std::endl;
+    fene << kinetic << " " << potential << " " << kinetic + potential << std::endl;
+  }
+  fpos.close();
+  fvel.close();
+
+};
