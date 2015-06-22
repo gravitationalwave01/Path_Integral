@@ -153,7 +153,7 @@ int main()
   int pspace_ctr = 0;
   std::vector<double> v_time{10000,50000,100000,500000};
   std::vector<double> v_dlambda{0.1,0.05,0.02,0.01};
-  std::vector<double> v_deltaT{1,0.05,0.02,0.01,0.005};
+  std::vector<double> v_deltaT{0.1,0.05,0.02,0.01,0.005};
   std::ofstream result("./data/deltaF.dat");
 
   result << "The output is formatted as follows: " << std::endl;
