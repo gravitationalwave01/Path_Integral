@@ -117,7 +117,7 @@ double simpson(std::vector<std::pair<double,double> >* func) // implementing sim
   for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 2; it < func->end(); it+=2)
   {
     ans += delta * ( (it-2)->second + 4 * (it-1)->second + it->second ) / 3; //simpson's 3/8 rule -- integrates three intervals at a time
-    std::cout << ans << std::endl;
+    //    std::cout << ans << std::endl;
   }
 
   int rem = func->size() % 2; // if we have leftover intervals
@@ -137,7 +137,7 @@ double simpson38(std::vector<std::pair<double,double> >* func) // implementing s
   for (std::vector<std::pair<double,double> >::iterator it = func->begin() + 3; it < func->end(); it+=3)
   {
     ans += 3.0/8.0 * delta * ( (it-3)->second + 3 * (it-2)->second + 3 * (it-1)->second + it->second ); //simpson's 3/8 rule -- integrates three intervals at a time
-    std::cout << ans << std::endl;
+    //    std::cout << ans << std::endl;
   }
   
   int rem = func->size() % 3; // if we have leftover intervals
@@ -158,7 +158,7 @@ int main()
   //initialize some constants
   int dim = 1;
   int P = 1;
-  double time = 1000; // total time to go from lambda = 0 to lambda = 1
+  double time = 10; // total time to go from lambda = 0 to lambda = 1
   double deltaT = 0.05;
 
 
@@ -171,8 +171,8 @@ int main()
   std::ofstream work("work.dat"); //stores the computed values for the work
 
   //create the two potentials
-  HarmonicPotential hp1(1.0,3.0);
-  HarmonicPotential hp2(1.0,5.0);
+  HarmonicPotential hp1(1.0,2.0);
+  HarmonicPotential hp2(1.0,6.0);
 
   //Initialize the random number generators
   std::default_random_engine generator;
@@ -181,7 +181,7 @@ int main()
 
 
   //Initialize a vector that will store an ensemble of ring polymers
-  int numPolymers = 100000;
+  int numPolymers = 10000000;
   std::vector<RP> ensemble;
   double tmp = 0;
 
@@ -202,6 +202,7 @@ int main()
       {
 	velocities.push_back(distribution(generator));
 	positions.push_back(0);
+	//		positions.push_back(distribution(generator));
       }	
     }
     
@@ -221,17 +222,13 @@ int main()
 
   //as we vary lambda, the potential changes and we need to wait for the system to equlibrate. 
   //after equlibrating we can sample the potential energy
-  int numSamples = 0;
-  double timeSinceLast = 0; //time since the last collision with the heat bath
-  int numCols = 0; //number of collisions
-  double prefactor = 0.5 * hp1.mass * (hp2.omega*hp2.omega - hp1.omega*hp1.omega);
   // Smoothly vary the potential-flipping parameter:
   double dlambda = deltaT/time;
-  double exp_work;
+  double exp_work=0;
   double progress = 0;
+  double progress2 = 0.05;
 
   pot = 0;
-  numSamples = 0;
   int counter = 0;
   double lambda;
   for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
@@ -240,6 +237,16 @@ int main()
     lambda = 0;
     for (double curTime = 0; curTime < time; curTime+=deltaT)
     {
+
+      //add in a thermostat
+      //      if ((double)lambda > progress2)
+      {
+	for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
+	  for (int j=0;j<dim;j++)
+	    it->velocity[j] = distribution(generator);
+	//	progress2 += 0.01;
+      }
+
       //update forces:
       for (int curBead = 0; curBead < myRP->P; curBead++)
 	for (int j=0;j<dim;j++)
@@ -274,39 +281,32 @@ int main()
 	for (int j=0;j<dim;j++)
 	  myRP->beads[curBead].velocity[j] += deltaT * 0.5 / myRP->beads[curBead].mass * (oldForces[curBead*dim+j]+curForces[curBead*dim+j]);
       
-      //compute current potential and kinetic energies
-      for (int curBead = 0; curBead < myRP->P; curBead++)
-	for (int j=0;j<dim;j++)
-	{
-	  kinetic += 0.5 * myRP->beads[curBead].mass * myRP->beads[curBead].velocity[j] * myRP->beads[curBead].velocity[j];
-	  potential += ( (1-lambda)*hp1.getPotential(myRP->beads[curBead].position[j]) + lambda*hp2.getPotential(myRP->beads[curBead].position[j]) );
-	}
-
-
       // sample dU/dlambda with some probability.
       // to sample dU/dlambda we really sample <x>, plug this x into (U_{lambda+dlambda/2) - U_{lambda-dlambda}) / 2
-      //      if (distribution(generator) >= 0 && timeSinceLast > 0) // 
       pot = 0;
       for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
 	for (int j=0;j<dim;j++)
 	{
-	  pot += hp2.getPotential(it->position[j]) - hp1.getPotential(it->position[j]);
+	  pot += ( hp2.getPotential(it->position[j]) - hp1.getPotential(it->position[j]) ) ;
 	  //	  dist << lambda << " " << it->velocity[j] << " " << it->position[j] << std::endl;
 	}
       integrand.push_back(std::pair<double,double>(curTime,pot)); 
       lambda += dlambda;
+      
+
 
     } //end of time loop
+
 
     counter++;
     tmp = 1/time * simpson38(&integrand);
     if ((double)counter/numPolymers > progress)
     {
-      std::cout << progress*100 << "% done " << std::endl;
+      std::cout << progress*100 << "% done " << std::endl << std::flush;
       progress += 0.1;
     }
     work << tmp << std::endl;
-    exp_work += exp(1/a*1/a * tmp);//assumes that mass=1 therefore a^2 = T
+    exp_work += exp(-1/a * 1/a * tmp); //assumes that mass=1 therefore a^2 = T
   } // end of ensemble loop
 
   //close all output files:
@@ -316,15 +316,8 @@ int main()
   fpot.close();
 
 
-  //output the obtained values of dU/dlambda
-  //  std::cout << "Here are the values of the potential" << std::endl;
-  //  for (std::vector<std::pair<double,double> >::iterator it = integrand.begin(); it < integrand.end(); it++)
-  //    std::cout << it->first << " " << it->second << std::endl;
-  //  std::cout << "Done outputting the values of the potential" << std::endl;
-
-  //  std::cout << " NUMBER OF COLLISIONS: " << numCols << std::endl;
-  //  std::vector<std::pair<double,double> > test;
+  //compute and print the free energy difference
   std::cout << "FREE ENERGY DIFFERENCE IS : " << std::endl;
-  std::cout << a*a*log(exp_work/numPolymers) << std::endl;
+  std::cout << -a*a*log(exp_work/numPolymers) << std::endl;
   
 };
