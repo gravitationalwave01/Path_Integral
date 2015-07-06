@@ -11,6 +11,14 @@
 
 //#define pb push_back;
 
+
+unsigned long long rdtsc()
+{
+  unsigned int lo,hi;
+  __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+  return ((unsigned long long)hi << 32) | lo;
+}
+
 class HarmonicPotential
 {
  public:
@@ -151,13 +159,18 @@ double simpson38(std::vector<std::pair<double,double> >* func) // implementing s
 int main()
 {
   int pspace_ctr = 0;
-  std::vector<double> v_time{10000,50000,100000,500000};
-  std::vector<double> v_dlambda{0.1,0.05,0.02,0.01};
-  std::vector<double> v_deltaT{0.1,0.05,0.02,0.01,0.005};
-  std::ofstream result("./data/deltaF.dat");
+  std::vector<double> v_time{100000};
+  std::vector<double> v_dlambda{0.02};
+  std::vector<double> v_deltaT{0.01};
+  std::ofstream result("./statistics/deltaF.dat");
 
   result << "The output is formatted as follows: " << std::endl;
   result << "pindex   time    deltaT    dlambda   trial  simp38   simp   trap " << std::endl;
+
+  //Initialize the random number generator
+  std::default_random_engine generator;
+  double a = 1; // a^2 = kT/m
+  std::normal_distribution<double> distribution(0,a);
 
 
   for (std::vector<double>::iterator vt_it = v_time.begin(); vt_it < v_time.end(); vt_it++)
@@ -169,7 +182,7 @@ int main()
 
   for (int trial = 0; trial < 5; trial++)
   {
-  
+    //    generator.seed(rdtsc());
   double time = *vt_it;
   double deltaT = *vdt_it;
   double dlambda = *vl_it;
@@ -187,18 +200,14 @@ int main()
   //  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
 
   std::stringstream fname("");
-  fname  << "./data/fpot" << pspace_ctr << "_t" << trial << ".dat"; //name of output file.
+  fname  << "./statistics/fpot" << pspace_ctr << "_t" << trial << ".dat"; //name of output file.
   std::ofstream fpot(fname.str().c_str());   // file for storing dU/dlambda values
   //  std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
 
   //create the two potentials
   HarmonicPotential hp1(1.0,3.0);
   HarmonicPotential hp2(1.0,12.0);
-
-  //Initialize the random number generators
-  std::default_random_engine generator;
-  double a = 1; // a^2 = kT/m
-  std::normal_distribution<double> distribution(0,a);
+  double answer = log(12.0/3.0);
 
 
   //Initialize a vector that will store an ensemble of ring polymers
@@ -336,14 +345,14 @@ int main()
    } //end of time loop
 
     integrand.push_back(std::pair<double,double>(lambda,pot/numSamples));
-    //    fpot << lambda << " " << pot/numSamples << " " << numSamples << std::endl;
+    //fpot << lambda << " " << pot/numSamples << " " << numSamples << std::endl;
   } // end of lambda loop
 
   //close all output files:
   //  fpos.close();
   //  fvel.close();
   //  fene.close();
-  //  fpot.close();
+  //fpot.close();
   //
 
   //output the obtained values of dU/dlambda
@@ -354,10 +363,10 @@ int main()
 
 
   result << pspace_ctr << " " << time << " " << deltaT << " " << dlambda << " " << trial << " " << 
-    simpson38(&integrand) << " " << simpson(&integrand) << " " << integrate(&integrand) << std::endl;
+    std::abs(simpson38(&integrand)-answer)/answer*100 << " " << std::abs(simpson(&integrand)-answer)/answer*100 << " " << std::abs(integrate(&integrand)-answer)/answer*100 << std::endl;
 
   }
-  result << std::endl;
+  //  result << std::endl;
   pspace_ctr++;
   }
   }
