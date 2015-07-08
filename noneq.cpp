@@ -165,9 +165,9 @@ int main()
   //initialize some constants
   int dim = 1;
   int P = 1;
-  double time = 100; // total time to go from lambda = 0 to lambda = 1
-  double deltaT = 0.1;
-  double collFreq = 0.00001; //fractional change in lambda before equilibrating with heat bath.
+  double time = 50; // total time to go from lambda = 0 to lambda = 1
+  double deltaT = 0.001;
+  double collFreq = 0.1; //fractional change in lambda before equilibrating with heat bath.
 
   double a = 1; // a^2 = kT/m
 
@@ -187,7 +187,7 @@ int main()
   //open the output files:
   //  std::ofstream fpos("positions.dat"); //for positions
   //  std::ofstream fvel("velocities.dat"); //for velocities
-  //  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
+  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
   //  std::ofstream fpot("fpot.dat");   // for dU/dlambda
   std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
   std::ofstream work("work.dat"); //stores the computed values for the work
@@ -246,28 +246,44 @@ int main()
   unsigned long int numcoll = 0;
 
 
-
-  for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
+  pot = 0;
+  int counter = 0;
+  double lambda =0;
+  //  std::vector<std::pair<double,double> > fart;
+  //  std::vector<std::vector<std::pair<double, double> > > integrand(numPolymers, fart); 
+  std::vector<std::vector<std::pair<double, double> > > integrand; 
+  for (int i=0;i<numPolymers;i++)
   {
-    pot = 0;
-    int counter = 0;
-    double lambda =0;
-    std::vector<std::pair<double, double> > integrand; //vector containing values of (lambda,dU/dlambda) to be integrated
-    
-    for (double curTime = 0; curTime < time; curTime+=deltaT)
-    {
-      //      std::cout << "i am here" << std::endl;
+    std::vector<std::pair<double,double> > blah;
+    integrand.push_back(blah);
+  }  
 
-      //add in a thermostat
-      if ((double)lambda > progress2)
-      {
+  //the size of integrand is numPolymers
+  std::vector<std::vector<std::pair<double, double> > >::iterator it_integrand; 
+
+  for (double curTime = 0; curTime < time; curTime+=deltaT)
+  {
+    
+    //add in a thermostat
+    if ((double)lambda > progress2)
+    {
+      for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
 	for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
 	  for (int j=0;j<dim;j++)
 	    it->velocity[j] = distribution(generator);
-	progress2 += collFreq;
-	numcoll++;
-      }
+      progress2 += collFreq;
+      numcoll++;
+    }
+    
+    for (int i = 0; i < ensemble[0].P; i++)
+      for (int j=0; j < dim; j++)
+	fene << curTime << " " << 0.5*ensemble[0].beads[i].velocity[j]*ensemble[0].beads[i].velocity[j] + 
+	  lambda*hp2.getPotential(ensemble[0].beads[i].position[j]) + (1-lambda) * hp1.getPotential(ensemble[0].beads[i].position[j]) << std::endl;
 
+
+    it_integrand = integrand.begin();
+    for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
+    {
       //update forces:
       for (int curBead = 0; curBead < myRP->P; curBead++)
 	for (int j=0;j<dim;j++)
@@ -307,34 +323,32 @@ int main()
       pot = 0;
       for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
 	for (int j=0;j<dim;j++)
-	  pot += ( hp2.getPotential(it->position[j]) - hp1.getPotential(it->position[j]) ) ;
+	    pot += ( hp2.getPotential(it->position[j]) - hp1.getPotential(it->position[j]) ) ;
 
-      integrand.push_back(std::pair<double,double>(curTime,pot)); 
-      lambda += dlambda;
-    } //end of time loop
+      it_integrand->push_back(std::pair<double,double>(curTime,pot)); 
+      it_integrand++;
+
+    } //end of ensemble loop
 
 
+    lambda += dlambda;
     counter++;
-    tmp = 1/time * simpson38(&integrand);
-
-    /*    if ((double)counter/numPolymers > progress)
-    {
-      //      std::cout << progress*100 << "% done " << std::endl << std::flush;
-      progress += 0.1;
-    }
-    */
-
-    work << tmp << std::endl;
-    exp_work += exp(-1/a * 1/a * tmp); //assumes that mass=1 therefore a^2 = T
-  } // end of polymer loop
+  } // end of time loop
 
   //close all output files:
   //  fpos.close();
   //  fvel.close();
   //  fene.close();
   //  fpot.close();
+  for (it_integrand = integrand.begin();it_integrand<integrand.end();it_integrand++)
+  {
+    tmp = 1/time * simpson38(&*it_integrand);
+    work << tmp << std::endl;
+    exp_work += exp(-1/a * 1/a * tmp); //assumes that mass=1 therefore a^2 = T
+  }
+
   deltaF.push_back(-a*a*log(exp_work/numPolymers));
-  std::cout << "Ratio of collisions with the bath : "<< (numcoll/numPolymers)/(time/deltaT) << std::endl;
+  std::cout << "Ratio of collisions with the bath : "<< (1 / collFreq) / (time/deltaT) << std::endl;
   }//end of trial loop
 
   double finalanswer = 0;
