@@ -159,10 +159,10 @@ double simpson38(std::vector<std::pair<double,double> >* func) // implementing s
 int main()
 {
   int pspace_ctr = 0;
-  std::vector<double> v_time{100000};
+  std::vector<double> v_time{1000};
   std::vector<double> v_dlambda{0.02};
-  std::vector<double> v_deltaT{0.01};
-  std::ofstream result("./statistics/deltaF.dat");
+  std::vector<double> v_deltaT{0.02};
+  std::ofstream result("./tmp/deltaF.dat");
 
   result << "The output is formatted as follows: " << std::endl;
   result << "pindex   time    deltaT    dlambda   trial  simp38   simp   trap " << std::endl;
@@ -200,7 +200,7 @@ int main()
   //  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
 
   std::stringstream fname("");
-  fname  << "./statistics/fpot" << pspace_ctr << "_t" << trial << ".dat"; //name of output file.
+  fname  << "./tmp/fpot" << pspace_ctr << "_t" << trial << ".dat"; //name of output file.
   std::ofstream fpot(fname.str().c_str());   // file for storing dU/dlambda values
   //  std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
 
@@ -363,7 +363,7 @@ int main()
 
 
   result << pspace_ctr << " " << time << " " << deltaT << " " << dlambda << " " << trial << " " << 
-    std::abs(simpson38(&integrand)-answer)/answer*100 << " " << std::abs(simpson(&integrand)-answer)/answer*100 << " " << std::abs(integrate(&integrand)-answer)/answer*100 << std::endl;
+    (simpson38(&integrand)-answer)/answer*100 << " " << (simpson(&integrand)-answer)/answer*100 << " " << (integrate(&integrand)-answer)/answer*100 << std::endl;
 
   }
   //  result << std::endl;

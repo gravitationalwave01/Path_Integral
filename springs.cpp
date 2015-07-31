@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <random>
-
+#include <sstream>
 //#define pb push_back;
 
 unsigned long long rdtsc()
@@ -195,8 +195,9 @@ int main()
   double eq_length = 0.5; //equilibrium length of each spring
   double omega = 1; // spring stiffness
   double answer = 1;
+  double P1[2] = {1,13};
+  double P2[2] = {13,1};
 
-  Pos pos((P+13)*eq_length, (P+1)*eq_length);
 
   double a = 1; // a^2 = kT/m
   //Initialize the random number generators
@@ -204,10 +205,11 @@ int main()
   std::normal_distribution<double> distribution(0,a);
 
 
-  int numTrials = 1;
+  int numTrials = 2;
   std::vector<double> deltaF;
   for (int trial = 0; trial < numTrials; trial++)
   {
+    Pos pos((P+P1[trial])*eq_length, (P+P2[trial])*eq_length);
     std::cout << "starting trial " << trial << " of " << numTrials << std::endl;
 
     //open the output files:
@@ -216,7 +218,12 @@ int main()
     //    std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
     std::ofstream fpot("fpot.dat");   // for dU/dlambda
     std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
-    std::ofstream work("work.dat"); //stores the computed values for the work
+    std::stringstream fname;
+    if (trial % 2 == 0)
+      fname << "fwork_t" << trial/2 << ".dat";
+    else
+      fname << "rwork_t" << trial/2 << ".dat";
+    std::ofstream work(fname.str().c_str()); //stores the computed values for the work
 
     //Initialize a vector that will store an ensemble of ring polymers
     int numPolymers = 500000;

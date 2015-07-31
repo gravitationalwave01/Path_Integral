@@ -62,6 +62,14 @@ double integrate(std::vector<std::pair<double,double> >* func)
 }
 
 
+unsigned long long rdtsc()
+{
+  unsigned int lo,hi;
+  __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+  return ((unsigned long long)hi << 32) | lo;
+}
+
+
 int main()
 {
   std::vector<std::pair<double,double> > test;
@@ -84,5 +92,13 @@ int main()
   std::cout << "simpson's: " << simpson(&test) << std::endl;
   std::cout << "trapezoid: " << integrate(&test) << std::endl;
 
+
+  std::ofstream output("test.dat");
+  double ibeta = 1.5;
+  std::default_random_engine generator(rdtsc());
+  std::normal_distribution<double> distribution(0,sqrt(ibeta));
+  for (int i=0;i<1000000;i++)
+    output << distribution(generator) << std::endl;
+  
   return 0;
 }

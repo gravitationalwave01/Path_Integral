@@ -1,3 +1,6 @@
+// Now I am trying to implement a thermalized (isokinetic) dyanmics.
+
+
 #include <utility>
 #include <iostream>
 #include <fstream>
@@ -16,6 +19,28 @@ unsigned long long rdtsc()
   __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
   return ((unsigned long long)hi << 32) | lo;
 }
+
+class QuarticPotential
+{
+ public:
+  double k;
+
+  QuarticPotential(double k_tmp)
+  {
+    k = k_tmp;
+  }
+
+  double getPotential(double pos)
+  {
+    return 0.5 * k * pos * pos * pos * pos;
+  }
+
+  double getForce(double pos)
+  {
+    return - 2 * k * pos * pos * pos;
+  }
+};
+
 
 class HarmonicPotential
 {
@@ -165,25 +190,31 @@ int main()
   //initialize some constants
   int dim = 1;
   int P = 1;
-  double time = 50; // total time to go from lambda = 0 to lambda = 1
-  double deltaT = 0.001;
-  double collFreq = 0.1; //fractional change in lambda before equilibrating with heat bath.
+  double timevec[5] = {1.0,3.0,10.0,30.0,100.0}; // total time to go from lambda = 0 to lambda = 1
+  double time;
+  double deltaT = 0.01;
+  double collFreqVec[5] = {0.05,0.01,0.005,0.001,0.0005}; //strength of interaction with bath
+  double collFreq;
 
-  double a = 1; // a^2 = kT/m
+  //  double a = 1.2247; // a^2 = kT/m
+  double ibeta = 1.5; //inverse beta, ibeta = kT
 
   //create the two potentials
-  double omega1 = 3;
-  double omega2 = 5;
+  double omega1 = 1;
+  double omega2 = 2;
   HarmonicPotential hp1(1.0,omega1);
   HarmonicPotential hp2(1.0,omega2);
-  double answer = 1/a*1/a * log(omega2/omega1);
+  double answer = ibeta * log(omega2/omega1);
+  std::ofstream tmp_out("tmp.dat");
 
-  int numTrials = 1;
+  int numTrials = 25;
   std::vector<double> deltaF;
   for (int trial = 0; trial < numTrials; trial++)
   {
     std::cout << "starting trial " << trial << " of " << numTrials << std::endl;
-
+    time = timevec[trial%5];
+    collFreq = collFreqVec[trial/5];
+    tmp_out << time << " " << collFreq << " " ;
   //open the output files:
   //  std::ofstream fpos("positions.dat"); //for positions
   //  std::ofstream fvel("velocities.dat"); //for velocities
@@ -194,12 +225,13 @@ int main()
 
   //Initialize the random number generators
   std::default_random_engine generator(rdtsc());
-  std::normal_distribution<double> distribution(0,a);
-
+  std::normal_distribution<double> pdist(0,sqrt(ibeta)); //momentum distribution
+  std::normal_distribution<double> xdist(0,1/omega1*sqrt(ibeta)); //position distribution
+  std::uniform_real_distribution<double> unif(0.0,1.0);
 
 
   //Initialize a vector that will store an ensemble of ring polymers
-  int numPolymers = 100;
+  int numPolymers = 10000;
   std::vector<RP> ensemble;
   double tmp = 0;
 
@@ -216,13 +248,13 @@ int main()
       masses.push_back(1);
       for (int curDim = 0; curDim < dim; curDim++)
       {
-	velocities.push_back(distribution(generator));
-	positions.push_back(0);
+	velocities.push_back(pdist(generator));
+	positions.push_back(xdist(generator));
       }	
     }
     
     //create a polymer with these initial conditions and store in the ensemble 
-    ensemble.push_back(RP(dim,P,&positions,&velocities,&masses));
+     ensemble.push_back(RP(dim,P,&positions,&velocities,&masses));
   }
   
   
@@ -264,17 +296,18 @@ int main()
   for (double curTime = 0; curTime < time; curTime+=deltaT)
   {
     
-    //add in a thermostat
-    if ((double)lambda > progress2)
+    //add in an Andersen thermostat
+
+    //    if ((double)lambda > progress2)
     {
       for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
 	for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
-	  for (int j=0;j<dim;j++)
-	    it->velocity[j] = distribution(generator);
-      progress2 += collFreq;
-      numcoll++;
+	  if (unif(generator) < deltaT * collFreq) 
+	    for (int j=0;j<dim;j++)
+	      it->velocity[j] = pdist(generator);
     }
     
+    //save the current total energy of the first RP to a file
     for (int i = 0; i < ensemble[0].P; i++)
       for (int j=0; j < dim; j++)
 	fene << curTime << " " << 0.5*ensemble[0].beads[i].velocity[j]*ensemble[0].beads[i].velocity[j] + 
@@ -285,6 +318,7 @@ int main()
     for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
     {
       //update forces:
+      //for RP: need to add in inter-bead forces
       for (int curBead = 0; curBead < myRP->P; curBead++)
 	for (int j=0;j<dim;j++)
 	{
@@ -309,6 +343,7 @@ int main()
 	    + deltaT * deltaT * 0.5 / myRP->beads[curBead].mass * curForces[curBead*dim+j];
       
       //update current forces while keeping the old ones
+      //TODO: add in inter-bead forces
       for (int curBead = 0; curBead < myRP->P; curBead++)
 	for (int j=0;j<dim;j++)
 	  curForces[curBead*dim+j] = (1-lambda)*hp1.getForce(myRP->beads[curBead].position[j]) + lambda*hp2.getForce(myRP->beads[curBead].position[j]);
@@ -338,17 +373,23 @@ int main()
   //close all output files:
   //  fpos.close();
   //  fvel.close();
-  //  fene.close();
+  fene.close();
   //  fpot.close();
+  double tmp_avg=0;
   for (it_integrand = integrand.begin();it_integrand<integrand.end();it_integrand++)
   {
     tmp = 1/time * simpson38(&*it_integrand);
     work << tmp << std::endl;
-    exp_work += exp(-1/a * 1/a * tmp); //assumes that mass=1 therefore a^2 = T
+    exp_work += exp(-1/ibeta * tmp); //assumes that mass=1 therefore a^2 = kT
+    tmp_avg += tmp;
   }
 
-  deltaF.push_back(-a*a*log(exp_work/numPolymers));
-  std::cout << "Ratio of collisions with the bath : "<< (1 / collFreq) / (time/deltaT) << std::endl;
+  //  std::cout << "W^a is " << tmp_avg / numPolymers << std::endl;
+  //  std::cout << "W^z is " << -ibeta*log(exp_work/numPolymers) << std::endl;
+  tmp_out << tmp_avg / numPolymers << " " << -ibeta*log(exp_work/numPolymers) << std::endl;
+
+  deltaF.push_back(-ibeta*log(exp_work/numPolymers));
+  //  std::cout << "Ratio of collisions with the bath : "<< (1 / collFreq) / (time/deltaT) << std::endl;
   }//end of trial loop
 
   double finalanswer = 0;
@@ -365,9 +406,10 @@ int main()
   stdDev = sqrt(stdDev);
 
   //compute and print the free energy difference
+  /*
   std::cout << "COMPUTED FREE ENERGY DIFFERENCE via " << numTrials << " trials IS : " << finalanswer << std::endl;
   std::cout << "EXPECTED " << answer << std::endl;
   std::cout << "ERROR " << ((finalanswer-answer)/answer)*100 << "%" << std::endl;
   std::cout << "STD DEV of delta F values is " << stdDev << std::endl;
-
+  */
 };
