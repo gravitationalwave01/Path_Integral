@@ -7,6 +7,6 @@ set xlabel "time"
 #set ylabel "en"
 #set yrange[-1:5]
 
-plot "positions.dat" u 1:2 w l title "position", "velocities.dat" u 1:2 w l title "velocity"
+plot "positions.dat" u 1:2 w l notitle, "positions.dat" u 1:3 w l notitle, "positions.dat" u 1:4 w l notitle
 
 

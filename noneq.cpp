@@ -1,4 +1,4 @@
-// Now I am trying to implement a thermalized (isokinetic) dyanmics.
+// Now I am trying to implement a thermalized (isokinetic) dynamics.
 
 
 #include <utility>
@@ -267,10 +267,6 @@ int main()
 
   
 
-  //as we vary lambda, the potential changes 
-  //to stay in the NVT ensemble we have to ocassionally equilibrate
-  //to stay in the nonequilibrium regime, we must equilibrate rarely.
-
   double dlambda = deltaT/time;
   double exp_work=0;
   double progress = 0;
@@ -308,11 +304,12 @@ int main()
     }
     
     //save the current total energy of the first RP to a file
+    /*
     for (int i = 0; i < ensemble[0].P; i++)
       for (int j=0; j < dim; j++)
 	fene << curTime << " " << 0.5*ensemble[0].beads[i].velocity[j]*ensemble[0].beads[i].velocity[j] + 
 	  lambda*hp2.getPotential(ensemble[0].beads[i].position[j]) + (1-lambda) * hp1.getPotential(ensemble[0].beads[i].position[j]) << std::endl;
-
+    */
 
     it_integrand = integrand.begin();
     for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
