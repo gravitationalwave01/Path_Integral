@@ -68,7 +68,7 @@ public:
 class Bead
 {
  public:
-  int dim; //dimension of the system
+ int dim; //dimension of the system
   double* position;
   double* velocity;
   double mass;
@@ -262,7 +262,7 @@ int main()
   //initialize some constants
   int dim = 1;
   int P = 3; //number of blocks
-  double timevec[3] = {1,5,10}; // total time to go from lambda = 0 to lambda = 1
+  double timevec[6] = {1,2,3,5,10,20}; // total time to go from lambda = 0 to lambda = 1
   double time;
   double deltaT = 0.01;
   double collFreq = 0.01; //frequency of collision with bath
@@ -279,7 +279,7 @@ int main()
   std::normal_distribution<double> pdist(0,sqrt(ibeta));
   std::uniform_real_distribution<double> unif(0.0,1.0);
 
-  int numTrials = 3;
+  int numTrials = 6;
   std::vector<double> deltaF;
 
   //open the output files:
@@ -425,8 +425,9 @@ int main()
       tmp_avg += tmp;
     }
 
+    std::cout << "simulation time is " << time << std::endl;
     std::cout << "W^a is " << tmp_avg / numPolymers << std::endl;
-    std::cout << "W^z is " << ibeta*log(exp_work/numPolymers) << std::endl;
+    std::cout << "W^z is " << -ibeta*log(exp_work/numPolymers) << std::endl;
       //tmp_out << tmp_avg / numPolymers << " " << -ibeta*log(exp_work/numPolymers) << std::endl;
 
     //close all output files:

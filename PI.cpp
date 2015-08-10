@@ -88,14 +88,12 @@ class RP
   std::vector<Bead> beads;
   int P; //number of beads
   double omega;
-  double eq_length;
 
-  RP(int d, int numBeads, std::vector<double>* positions, std::vector<double>* velocities, std::vector<double>* masses, double o, double eq)
+  RP(int d, int numBeads, std::vector<double>* positions, std::vector<double>* velocities, std::vector<double>* masses, double o)
   {
     P = numBeads;
     dim = d;
     omega = o;
-    eq_length = eq;
 
     for (int i =0; i < numBeads; i++)
     {
@@ -169,7 +167,7 @@ double simpson38(std::vector<std::pair<double,double> >* func) // implementing s
 
 
 //propogates a single ring polymer in time by a single time step deltaT
-int velocityVerlet(RP* myRP, double deltaT)
+double velocityVerlet(RP* myRP, double deltaT, HarmonicPotential* hp)
 {
   std::vector<double> curForces;
   std::vector<double> oldForces;
@@ -178,26 +176,27 @@ int velocityVerlet(RP* myRP, double deltaT)
   double dim = myRP->dim;
   double tmp;
   double omega = myRP->omega;
-  double eq_length = myRP->eq_length;
   
 
   //update forces:
   for (int curBead = 0; curBead < myRP->P; curBead++)
     for (int j=0;j<dim;j++)
     {
-      if (curBead == 0) //to compute interaction with last bead, "move" the last bead to position 0
-	tmp = - omega*omega*myRP->beads[0].mass * 
-	        ( (myRP->beads[0].position[j] - (myRP->beads[myRP->P-1].position[j] - myRP->P * eq_length) - eq_length) 
-		- (myRP->beads[1].position[j] - myRP->beads[0].position[j] - eq_length) );
-      else if (curBead == myRP->P - 1) //to compute interaction with first bead, "move" the first bead to position myRP->P * eq_length
-	tmp = - omega*omega*myRP->beads[myRP->P-1].mass * 
-	        ( (myRP->beads[myRP->P-1].position[j] - myRP->beads[myRP->P-2].position[j] - eq_length) 
-	      - ( (myRP->beads[0].position[j] + myRP->P * eq_length) - myRP->beads[myRP->P-1].position[j] - eq_length ) );
+      if (curBead == 0) 
+	tmp =  omega*omega*myRP->beads[0].mass * 
+	  ( (myRP->beads[myRP->P-1].position[j] - myRP->beads[0].position[j] ) 
+	  + (myRP->beads[1].position[j] - myRP->beads[0].position[j]) );
+      else if (curBead == myRP->P - 1) 
+	tmp =  omega*omega*myRP->beads[myRP->P-1].mass * 
+	  ( (myRP->beads[myRP->P-1].position[j] - myRP->beads[myRP->P-1].position[j] ) 
+	  + (myRP->beads[0].position[j] - myRP->beads[myRP->P-1].position[j] ) );
       else 
-	tmp = - omega*omega*myRP->beads[curBead].mass * 
-	        ( (myRP->beads[curBead].position[j] - myRP->beads[curBead-1].position[j] - eq_length) 
-	        - (myRP->beads[curBead+1].position[j] - myRP->beads[curBead].position[j] - eq_length) );
+	tmp =  omega*omega*myRP->beads[curBead].mass * 
+	  ( (myRP->beads[curBead-1].position[j] - myRP->beads[curBead].position[j] ) 
+	  + (myRP->beads[curBead+1].position[j] - myRP->beads[curBead].position[j] ) );
       
+      tmp += hp->getForce(myRP->beads[curBead].position[j]) / myRP->P; //accounts for external potential
+
       curForces[curBead*dim+j] = tmp;
       oldForces[curBead*dim+j] = tmp;
     }
@@ -212,18 +211,20 @@ int velocityVerlet(RP* myRP, double deltaT)
   for (int curBead = 0; curBead < myRP->P; curBead++)
     for (int j=0;j<dim;j++)
     {
-      if (curBead == 0) //to compute interaction with last bead, "move" the last bead to position 0
-	tmp = - omega*omega*myRP->beads[0].mass * 
-	        ( (myRP->beads[0].position[j] - (myRP->beads[myRP->P-1].position[j] - myRP->P * eq_length) - eq_length) 
-		- (myRP->beads[1].position[j] - myRP->beads[0].position[j] - eq_length) );
-      else if (curBead == myRP->P - 1) //to compute interaction with first bead, "move" the first bead to position myRP->P * eq_length
-	tmp = - omega*omega*myRP->beads[myRP->P-1].mass * 
-	        ( (myRP->beads[myRP->P-1].position[j] - myRP->beads[myRP->P-2].position[j] - eq_length) 
-	      - ( (myRP->beads[0].position[j] + myRP->P * eq_length) - myRP->beads[myRP->P-1].position[j] - eq_length ) );
+      if (curBead == 0) 
+	tmp =  omega*omega*myRP->beads[0].mass * 
+	  ( (myRP->beads[myRP->P-1].position[j] - myRP->beads[0].position[j] ) 
+	  + (myRP->beads[1].position[j] - myRP->beads[0].position[j]) );
+      else if (curBead == myRP->P - 1) 
+	tmp =  omega*omega*myRP->beads[myRP->P-1].mass * 
+	  ( (myRP->beads[myRP->P-2].position[j] - myRP->beads[myRP->P-1].position[j] ) 
+	  + (myRP->beads[0].position[j] - myRP->beads[myRP->P-1].position[j] ) );
       else 
-	tmp = - omega*omega*myRP->beads[curBead].mass * 
-	        ( (myRP->beads[curBead].position[j] - myRP->beads[curBead-1].position[j] - eq_length) 
-	        - (myRP->beads[curBead+1].position[j] - myRP->beads[curBead].position[j] - eq_length) );
+	tmp =  omega*omega*myRP->beads[curBead].mass * 
+	  ( (myRP->beads[curBead-1].position[j] - myRP->beads[curBead].position[j] ) 
+	  + (myRP->beads[curBead+1].position[j] - myRP->beads[curBead].position[j] ) );
+
+      tmp += hp->getForce(myRP->beads[curBead].position[j]) / myRP->P; //accounts for external potential
       
       curForces[curBead*dim+j] = tmp;
     }
@@ -232,7 +233,18 @@ int velocityVerlet(RP* myRP, double deltaT)
   for (int curBead = 0; curBead < myRP->P; curBead++)
     for (int j=0;j<dim;j++)
       myRP->beads[curBead].velocity[j] += deltaT * 0.5 / myRP->beads[curBead].mass * (oldForces[curBead*dim+j]+curForces[curBead*dim+j]);
-  
+
+  double energy = 0;
+  //compute the energy of the system
+  for (int curBead = 0; curBead < myRP->P; curBead++)
+    for (int j=0;j<dim;j++)
+    {
+      energy += 0.5 * myRP->beads[curBead].velocity[j] * myRP->beads[curBead].velocity[j];
+      energy += hp->getPotential(myRP->beads[curBead].position[j]);
+      energy += 0.5 * omega * omega * (myRP->beads[curBead].position[j] * myRP->beads[(curBead+1) % myRP->P].position[j])*(myRP->beads[curBead].position[j] * myRP->beads[(curBead+1) % myRP->P].position[j]);
+    }
+
+  return energy;
 };
 
 
@@ -244,33 +256,30 @@ int main()
   //initialize some constants
   int dim = 1;
   int P = 4; //number of blocks
-  double timevec[1] = {10}; // total time to go from lambda = 0 to lambda = 1
+  double ibeta = 0.5; // ibeta = 1/beta = kT
+  double timevec[1] = {300}; // total time to go from lambda = 0 to lambda = 1
   double time;
   double deltaT = 0.01;
-  double collFreq = 0.01; //frequency of collision with bath
-  double eq_length = 1; //equilibrium length of each spring
-  double omega = 1; // spring stiffness
+  double collFreq = 0.001; //frequency of collision with bath
+  double omega = P*ibeta; // spring stiffness
   double answer = 1;
+  HarmonicPotential hp(1,1);
 
 
-  double ibeta = 0.1; // ibeta = 1/beta = kT
   //Initialize the random number generators
   std::default_random_engine generator(rdtsc());
   std::normal_distribution<double> pdist(0,sqrt(ibeta));
   std::uniform_real_distribution<double> unif(0.0,1.0);
 
   int numTrials = 1;
-  std::vector<double> deltaF;
 
   //open the output files:
   std::ofstream fpos("positions.dat"); //for positions
   //  std::ofstream fvel("velocities.dat"); //for velocities
-  //    std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
+  std::ofstream fene("energy.dat"); //for energies (kinetic and potential)
   std::ofstream fpot("fpot.dat");   // for dU/dlambda
   std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
-  std::stringstream fname;
-  fname << "work.dat";
-  std::ofstream work(fname.str().c_str()); //stores the computed values for the work
+  std::ofstream work("work.dat"); //stores the computed values for the work
   int obs_trial = 0; //the trial about which we record dyanmics, work, distributions, etc.
   int collCount = 0; // counts the number of collisions with the heat bath
 
@@ -283,39 +292,64 @@ int main()
 
 
     //Initialize a vector that will store an ensemble of ring polymers
-    int numPolymers = 10000;
+    int numPolymers = 100;
     std::vector<RP> ensemble;
     double tmp = 0;
 
 
     //initialize the ensemble with RP velocities randomly from this distribution
     //this equilibrates the initial state
+    double comp;
     for (int i = 0; i < numPolymers; i++)
     {
       std::vector<double> positions;
       std::vector<double> velocities;
       std::vector<double> masses;
-    
+
+      comp = 0;
       for (int curBead = 0; curBead < P; curBead++)
       {
 	masses.push_back(1.0);
 	for (int curDim = 0; curDim < dim; curDim++)
 	{
-	  velocities.push_back(pdist(generator));
-	  positions.push_back((curBead+1)*eq_length); //equilibrium position
+	  tmp = pdist(generator);
+	  comp += tmp; //ignores dimensions > 1 !!!!!
+	  velocities.push_back(tmp);
+	  positions.push_back(pdist(generator) / 5.0); //equilibrium position
 	}	
       }
     
+      for (int curBead = 0; curBead < P; curBead++)
+	positions[curBead] -= comp / P;
+
       //create a polymer with these initial conditions and store in the ensemble 
-      ensemble.push_back(RP(dim,P,&positions,&velocities,&masses,omega,eq_length));
+      ensemble.push_back(RP(dim,P,&positions,&velocities,&masses,omega));
     }
   
     //we have the ensemble initialized with the proper kinetic energy, but we still need to get the right configuration
     //for this, we propogate in time for a bit:
-    for (double time_t = 0; time_t < 10; time_t += deltaT) //we don't care too much about energy conservation -- just get a distribution!
+    for (double time_t = 0; time_t < 3; time_t += deltaT) //we don't care too much about energy conservation -- just get a distribution!
     {
+      /*
+      fpos << time_t << " " << ensemble[0].beads[0].position[0] 
+	   << " " << ensemble[0].beads[1].position[0] 
+	   << " " << ensemble[0].beads[2].position[0] 
+	   << " " << ensemble[0].beads[3].position[0] << std::endl;
+      */
+
       for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
-	velocityVerlet(&*myRP, deltaT);
+	velocityVerlet(&*myRP, deltaT, &hp);
+
+      /*
+      for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
+	for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
+	  if (unif(generator) < deltaT * collFreq) 
+	  {
+	    for (int j=0;j<dim;j++)
+	      it->velocity[j] = pdist(generator); //only while the mass = 1
+	    collCount++;
+	  }
+      */
     }
     
     for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
@@ -328,26 +362,17 @@ int main()
 	for (int j=0;j<dim;j++)
 	  it->velocity[j] = pdist(generator); //only while the mass = 1
     
-
-
     
     double sample; //sample stores the quantity that I am sampling
-    int numSamples = 0;
+    unsigned long numSamples = 0;
     double dlambda = deltaT/time;
     double exp_work=0;
     double lambda = 0;
     
-    std::vector<std::vector<std::pair<double, double> > > integrand; 
-    for (int i=0;i<numPolymers;i++)
-    {
-      std::vector<std::pair<double,double> > blah;
-      integrand.push_back(blah);
-    } 
-    std::vector<std::vector<std::pair<double, double> > >::iterator it_integrand;
-    
-    
 
+    std::cout << " ..... INITIALIZED " << std::endl;
     lambda = 0;
+    collCount = 0;
     for (double curTime = 0; curTime <= time; curTime+=deltaT)
     {
       
@@ -357,9 +382,7 @@ int main()
 	     << " " << ensemble[0].beads[2].position[0] 
       	     << " " << ensemble[0].beads[3].position[0] << std::endl;
       
-      
       //Andersen thermostat
-      /*
       for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
 	for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
 	  if (unif(generator) < deltaT * collFreq) 
@@ -367,43 +390,35 @@ int main()
 	    for (int j=0;j<dim;j++)
 	      it->velocity[j] = pdist(generator); //only while the mass = 1
 	    collCount++;
+	    //	    std::cout << "collision!" << std::endl;
 	  }
-      */
+
 
       //propagate in time
+      double energy = 0;
       for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
-	{
+	energy += velocityVerlet(&*myRP,deltaT,&hp);
+      fene << lambda << " " << energy <<std::endl;
 
-	  //int velocityVerlet(RP* myRP, double deltaT, double wall)
-	  velocityVerlet(&*myRP,deltaT);
-	
-	
-	} //end of ensemble loop
 
       // sample with some probability.
-      if (unif(generator) < 0.25)
-	sample += myRP-
+      for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
+	if (unif(generator) < 0.25)
+	  for(int i = 0; i < myRP->P; i++)
+	    for (int j = 0; j < dim; j++)
+	    {
+	      sample += myRP->beads[i].velocity[j] * myRP->beads[i].velocity[j];
+	      numSamples++;
+	    }
 	  
       
       lambda += dlambda;
     } // end of time loop
     
 
-    tmp = 0;
-    double tmp_avg=0;
-    for (it_integrand = integrand.begin();it_integrand<integrand.end();it_integrand++)
-    {
-      tmp = 1/time * simpson38(&*it_integrand);
-      if (trial == obs_trial)
-	work << tmp << std::endl;
-      exp_work += exp(-1/ibeta * tmp); //assumes that mass=1 therefore a^2 = kT
-      tmp_avg += tmp;
-    }
-
-    std::cout << "time of simulation is " << time << " and the number of collisions was " << collCount << std::endl;
-    std::cout << "W^a is " << tmp_avg / numPolymers << std::endl;
-    std::cout << "W^z is " << ibeta*log(exp_work/numPolymers) << std::endl;
-      //tmp_out << tmp_avg / numPolymers << " " << -ibeta*log(exp_work/numPolymers) << std::endl;
+    std::cout << "time of simulation is " << time << ", deltaT is " << deltaT << std::endl;
+    std::cout << "the number of collisions was " << collCount << ", which is once every " << ((time/deltaT)/collCount) << "time steps " << std::endl;
+    std::cout << "the expectation value is " << (sample/numSamples)/P << std::endl;
 
     //close all output files:
     //  fpos.close();
