@@ -256,19 +256,17 @@ int main()
   //initialize some constants
   int dim = 1;
   int P = 4; //number of blocks
-  double ibeta = 0.5; // ibeta = 1/beta = kT
+  double ibetavec[3] = {0.5,1.0,2.0}; // ibeta = 1/beta = kT
+  double ibeta;
   double timevec[1] = {300}; // total time to go from lambda = 0 to lambda = 1
   double time;
   double deltaT = 0.01;
   double collFreq = 0.001; //frequency of collision with bath
-  double omega = P*ibeta; // spring stiffness
-  double answer = 1;
   HarmonicPotential hp(1,1);
 
 
   //Initialize the random number generators
   std::default_random_engine generator(rdtsc());
-  std::normal_distribution<double> pdist(0,sqrt(ibeta));
   std::uniform_real_distribution<double> unif(0.0,1.0);
 
   int numTrials = 1;
@@ -280,19 +278,26 @@ int main()
   std::ofstream fpot("fpot.dat");   // for dU/dlambda
   std::ofstream dist("dist.dat"); //stores the distribution of velocities (should be an MB distribution)
   std::ofstream work("work.dat"); //stores the computed values for the work
+  int curoutinc = 4;
+  int curout = curoutinc;
   int obs_trial = 0; //the trial about which we record dyanmics, work, distributions, etc.
   int collCount = 0; // counts the number of collisions with the heat bath
 
   for (int trial = 0; trial < numTrials; trial++)
   {
     collCount = 0;
-    time = timevec[trial];
+    time = timevec[0];
     std::cout << "starting trial " << trial+1 << " of " << numTrials << std::endl;
+
+    double ibeta = ibetavec[trial];
+    double Pibeta = ibeta / P; // beta_P = P/beta
+    double Pomega = sqrt(P) * ibeta; // spring stiffness
+    std::normal_distribution<double> pdist(0,sqrt(Pibeta)); //boltzmann distribution for momenta
 
 
 
     //Initialize a vector that will store an ensemble of ring polymers
-    int numPolymers = 100;
+    int numPolymers = 5000;
     std::vector<RP> ensemble;
     double tmp = 0;
 
@@ -323,12 +328,12 @@ int main()
 	positions[curBead] -= comp / P;
 
       //create a polymer with these initial conditions and store in the ensemble 
-      ensemble.push_back(RP(dim,P,&positions,&velocities,&masses,omega));
+      ensemble.push_back(RP(dim,P,&positions,&velocities,&masses,Pomega));
     }
   
     //we have the ensemble initialized with the proper kinetic energy, but we still need to get the right configuration
     //for this, we propogate in time for a bit:
-    for (double time_t = 0; time_t < 3; time_t += deltaT) //we don't care too much about energy conservation -- just get a distribution!
+    for (double time_t = 0; time_t < curoutinc*4+0.5; time_t += deltaT) //we don't care too much about energy conservation -- just get a distribution!
     {
       /*
       fpos << time_t << " " << ensemble[0].beads[0].position[0] 
@@ -336,11 +341,26 @@ int main()
 	   << " " << ensemble[0].beads[2].position[0] 
 	   << " " << ensemble[0].beads[3].position[0] << std::endl;
       */
+      if ( time_t > curout ) 
+      {
+	std::stringstream ss;
+	ss << "xdist" << curout/curoutinc << ".dat";
+	std::ofstream xdist(ss.str().c_str());
+	ss.str("");
+	ss << "vdist" << curout/curoutinc << ".dat";
+	std::ofstream vdist(ss.str().c_str());
 
+	for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
+	{
+	  xdist << myRP->beads[0].position[0] << std::endl;
+	  vdist << myRP->beads[0].velocity[0] << std::endl;
+	}
+	curout+=curoutinc;
+      }
+      
       for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
 	velocityVerlet(&*myRP, deltaT, &hp);
 
-      /*
       for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
 	for (std::vector<Bead>::iterator it = myRP->beads.begin(); it < myRP->beads.end(); it++)
 	  if (unif(generator) < deltaT * collFreq) 
@@ -349,7 +369,6 @@ int main()
 	      it->velocity[j] = pdist(generator); //only while the mass = 1
 	    collCount++;
 	  }
-      */
     }
     
     for(std::vector<RP>::iterator myRP = ensemble.begin(); myRP < ensemble.end(); myRP++)
@@ -371,6 +390,10 @@ int main()
     
 
     std::cout << " ..... INITIALIZED " << std::endl;
+    std::cout << "time of simulation is " << time << ", deltaT is " << deltaT << std::endl;
+    std::cout << "the number of collisions was " << collCount << ", which is once every " << ((time/deltaT)/collCount) << "time steps " << std::endl;
+
+    break;
     lambda = 0;
     collCount = 0;
     for (double curTime = 0; curTime <= time; curTime+=deltaT)
@@ -407,7 +430,7 @@ int main()
 	  for(int i = 0; i < myRP->P; i++)
 	    for (int j = 0; j < dim; j++)
 	    {
-	      sample += myRP->beads[i].velocity[j] * myRP->beads[i].velocity[j];
+	      sample += myRP->beads[i].position[j] * myRP->beads[i].position[j];
 	      numSamples++;
 	    }
 	  
