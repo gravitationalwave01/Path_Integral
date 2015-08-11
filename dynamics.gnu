@@ -3,7 +3,7 @@ set output "dynamics.png"
 
 set title "Dynamics of a single harmonic oscillator while the potential is varied"
 set xlabel "time"
-set xrange [0:.15]
+#set xrange [20:40]
 #set ylabel "en"
 #set yrange[-1:5]
 
